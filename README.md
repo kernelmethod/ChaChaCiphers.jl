@@ -4,3 +4,59 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://kernelmethod.github.io/ChaChaCiphers.jl/dev)
 [![Build Status](https://github.com/kernelmethod/ChaChaCiphers.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/kernelmethod/ChaChaCiphers.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/kernelmethod/ChaChaCiphers.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/kernelmethod/ChaChaCiphers.jl)
+
+`ChaChaCiphers` is a Julia package that provides a CUDA-compatible
+implementation of the ChaCha stream cipher family, and implements the
+`Random.AbstractDevice` interface to use ChaCha for cryptographically secure
+random number generation (CRNG).
+
+This package seeks to accomplish the following goals:
+
+- Provide performant and reproducible CRNG for CPU and GPU computations
+- Implement basic cryptographic primitives that can be used as a building block
+  in higher-level cryptographic code (e.g. for building ChaCha20-Poly1305).
+
+## Usage
+
+You can start using ChaChaCiphers.jl for random number generation by creating a
+`ChaChaStream` instance:
+
+```julia
+julia> using ChaChaCiphers
+
+julia> rng = ChaChaStream();
+```
+
+This will create a `ChaChaStream` with a randomly-generated key. Alternatively,
+you can specify a key and pass it in to `ChaChaStream` to create a reproducible
+random number stream
+
+```julia
+julia> key = UInt32.([
+          0xe2e39848, 0x70bb974d, 0x845f88b4, 0xb30725e4,
+          0x15c309dc, 0x72d545bb, 0x466e99e3, 0x6a759f91
+       ]);
+
+julia> rng = ChaChaStream(key);
+```
+
+You can then pass `rng` into random number generation functions like `rand` or
+`randn`:
+
+```julia
+julia> rand(rng, UInt8)
+0x18
+
+julia> rand(rng, 1:10, 3)
+3-element Vector{Int64}:
+ 8
+ 4
+ 3
+
+julia> randn(rng, 3)
+3-element Vector{Float64}:
+  0.4899558093907058
+ -0.4164526650672216
+ -0.864497576500388
+```
+
