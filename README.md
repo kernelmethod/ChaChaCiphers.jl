@@ -5,16 +5,15 @@
 [![Build Status](https://github.com/kernelmethod/ChaChaCiphers.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/kernelmethod/ChaChaCiphers.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/kernelmethod/ChaChaCiphers.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/kernelmethod/ChaChaCiphers.jl)
 
-`ChaChaCiphers` is a Julia package that provides a CUDA-compatible
-implementation of the ChaCha stream cipher family, and implements the
-`Random.AbstractDevice` interface to use ChaCha for cryptographically secure
-random number generation (CRNG).
+[ChaChaCiphers](https://github.com/kernelmethod/ChaChaCiphers.jl) is a
+CUDA-compatible, pure-Julia implementation of the ChaCha family of stream
+ciphers. This package provides:
 
-This package seeks to accomplish the following goals:
-
-- Provide performant and reproducible CRNG for CPU and GPU computations
-- Implement basic cryptographic primitives that can be used as a building block
-  in higher-level cryptographic code (e.g. for building ChaCha20-Poly1305).
+- fast, cryptographically-secure, and reproducible random number generators
+  implementing Julia's `AbstractRNG` interface for both CPU and GPU, and
+- implementations of ChaCha stream ciphers such as ChaCha20 that can be used as
+  building blocks for other cryptographic primitives, such as the
+  ChaCha20-Poly1305 AEAD algorithm.
 
 ## Usage
 
