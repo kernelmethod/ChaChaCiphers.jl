@@ -6,6 +6,21 @@ using Statistics
 using Test
 
 @testset "ChaChaStream random number generation tests" begin
+    @testset "Test create keystream" begin
+        # Create a ChaChaStream with the default parameters
+        stream = ChaChaStream()
+        @test stream.nonce == 0
+        @test stream.position == 1
+
+        stream = ChaChaStream(; doublerounds=4)
+        @test stream.doublerounds == 4
+
+        # We should receive an error if we try to create a
+        # keystream with non-positive number of doublerounds
+        @test_throws ErrorException ChaChaStream(; doublerounds=0)
+        @test_throws ErrorException ChaChaStream(; doublerounds=-10)
+    end
+
     @testset "Sample random numbers from a collection" begin
         stream = ChaCha12Stream(zeros(8), 0)
         samples = rand(stream, Int(0):Int(1), 65536)

@@ -65,7 +65,7 @@ abstract type AbstractChaChaStream <: AbstractRNG end
 # Constructors
 
 (::Type{T})(; kws...) where {T <: AbstractChaChaStream} =
-    T(SVector{8,UInt32}(rand(RandomDevice(), UInt32, 8)))
+    T(SVector{8,UInt32}(rand(RandomDevice(), UInt32, 8)); kws...)
 (::Type{T})(key; kws...) where {T <: AbstractChaChaStream} =
     T(key, UInt64(0); kws...)
 (::Type{T})(state::ChaChaState) where {T <: AbstractChaChaStream} =
