@@ -9,6 +9,9 @@ using Random: SamplerType
 
 Random.rng_native_52(::ChaChaStream) = UInt64
 
+Random.rand(rng::ChaChaStream, ::Type{T}) where {T <: BitInteger} =
+    _fetch_one!(rng, T)
+
 Random.rand(rng::ChaChaStream, T::Random.SamplerType{<:BitInteger}) =
     _fetch_one!(rng, T[])
 

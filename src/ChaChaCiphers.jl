@@ -9,5 +9,6 @@ include("generation.jl")
 export ChaCha
 export ChaChaStream, ChaCha20Stream, ChaCha12Stream
 export getstate
+export encrypt, decrypt, encrypt!, decrypt!
 
 end

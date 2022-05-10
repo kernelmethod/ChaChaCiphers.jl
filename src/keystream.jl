@@ -45,7 +45,9 @@ ChaCha12Stream(args...) = ChaChaStream(args...; doublerounds=6)
 Base.show(io::IO, rng::ChaChaStream) =
     write(io, "ChaChaStream(key=$(rng.key), nonce=$(rng.nonce), counter=$(rng.counter))")
 
-buffer_size(stream::ChaChaStream) = STREAM_BUFFER_SIZE - stream.position
+buffer_size(stream::ChaChaStream) = length(stream.buffer) - stream.position + 1
+
+# Accessors; must be defined for AbstractChaChaStream.
 
 key(stream::ChaChaStream) = stream.key
 nonce(stream::ChaChaStream) = stream.nonce
@@ -53,26 +55,20 @@ counter(stream::ChaChaStream) = stream.counter
 position(stream::ChaChaStream) = stream.position
 doublerounds(stream::ChaChaStream) = stream.doublerounds
 
-@generated function _refresh_buffer!(stream::ChaChaStream)
-    local blocks_in_buffer, rem = divrem(STREAM_BUFFER_SIZE, CHACHA_BLOCK_SIZE)
-    local words_per_block = div(CHACHA_BLOCK_SIZE, sizeof(UInt32))
-
-    if rem != 0
-        error("STREAM_BUFFER_SIZE must be a multiple of CHACHA_BLOCK_SIZE")
-    end
-
-    quote
-        _fill_blocks!(stream.buffer, stream, $(blocks_in_buffer))
-        stream.position = 1
-        stream
-    end
+function _refresh_buffer!(stream::ChaChaStream)
+    _fill_blocks!(
+        stream.buffer,
+        stream,
+        STREAM_BUFFER_BLOCKS
+    )
+    stream.position = 1
+    stream
 end
 
 # Fill a buffer with a block of the keystream
 function _fill_blocks!(
     buffer::AbstractVector{T}, stream::ChaChaStream, nblocks::Int
 ) where {T <: BitInteger}
-    # Buffer length when viewed as an array of u32
     bufsize_u32 = div(length(buffer) * sizeof(T), sizeof(UInt32))
 
     GC.@preserve buffer begin
@@ -98,25 +94,21 @@ function _fill_blocks!(
 end
 
 # Fetch bytes from the ChaChaStream buffer and increment the position index
-@generated function _fetch_one!(stream::ChaChaStream, ::Type{T}) where {T <: BitInteger}
-    local type_size = sizeof(T)
-
-    quote
-        if buffer_size(stream) < $(type_size)
-            _refresh_buffer!(stream)
-        end
-
-        buffer = stream.buffer
-
-        val = GC.@preserve buffer begin
-            p = pointer(buffer, stream.position)
-            p = Base.unsafe_convert(Ptr{T}, p)
-            unsafe_load(p)
-        end
-
-        stream.position += $(type_size)
-        val
+function _fetch_one!(stream::ChaChaStream, ::Type{T}) where {T <: BitInteger}
+    if buffer_size(stream) < sizeof(T)
+        _refresh_buffer!(stream)
     end
+
+    buffer = stream.buffer
+
+    val = GC.@preserve buffer begin
+        p = pointer(buffer, stream.position)
+        p = Base.unsafe_convert(Ptr{T}, p)
+        unsafe_load(p)
+    end
+
+    stream.position += sizeof(T)
+    val
 end
 
 function _fill_buffer!(dest::AbstractVector{UInt8}, stream::ChaChaStream)
@@ -138,12 +130,9 @@ function _fill_buffer!(dest::AbstractVector{UInt8}, stream::ChaChaStream)
     # Instead of repeatedly operating on the stream buffer, we insert
     # as many blocks of the keystream into the destination as possible
     (n_blocks, rem) = divrem(length(dest) - bfsize, CHACHA_BLOCK_SIZE)
-    n_blocks = Int(n_blocks)
-    #slice = view(dest, bfsize + 1:bfsize + n_blocks * CHACHA_BLOCK_SIZE)
     GC.@preserve dest begin
         sp = pointer(dest, bfsize + 1)
         slice = unsafe_wrap(Vector{UInt8}, sp, n_blocks * CHACHA_BLOCK_SIZE, own=false)
-        #state = unsafe_wrap(Vector{UInt32}, sp, bufsize_u32, own=false)
         _fill_blocks!(slice, stream, n_blocks)
     end
 
@@ -154,3 +143,28 @@ function _fill_buffer!(dest::AbstractVector{UInt8}, stream::ChaChaStream)
 
     dest
 end
+
+#=
+Stream cipher methods
+=#
+
+"""
+    decrypt(stream::ChaChaStream, x)
+    decrypt!(stream::ChaChaStream, x)
+
+Decrypt an encrypted vector `x` using the keystream from a [`ChaChaStream`](@ref).
+"""
+decrypt!(stream::ChaChaStream, x) = encrypt!(stream, x)
+decrypt(stream::ChaChaStream, x) = decrypt!(stream, copy(x))
+decrypt(stream::ChaChaStream, x::AbstractString) = decrypt!(stream, collect(codeunits(x)))
+
+"""
+    encrypt(stream::ChaChaStream, x)
+    encrypt!(stream::ChaChaStream, x)
+
+Encrypt a vector or string `x` using the keystream from a [`ChaChaStream`](@ref).
+"""
+encrypt!(stream::ChaChaStream, x::DenseVector{T}) where {T <: BitInteger} =
+    map!(u -> u ⊻ _fetch_one!(stream, T), x, x)
+encrypt(stream::ChaChaStream, x) = encrypt!(stream, copy(x))
+encrypt(stream::ChaChaStream, x::AbstractString) = encrypt!(stream, collect(codeunits(x)))
