@@ -203,7 +203,7 @@ end
                 counter = UInt64(0)
 
                 ctr = chacha_blocks!(state, key, nonce, counter, 1024 ÷ 16)
-                ctr_gpu = chacha_blocks!(state_gpu, key_gpu, nonce, counter, 1024 ÷ 16)
+                CUDA.@sync ctr_gpu = chacha_blocks!(state_gpu, key_gpu, nonce, counter, 1024 ÷ 16)
 
                 @test ctr == ctr_gpu
                 @test state_gpu == CuArray(state)

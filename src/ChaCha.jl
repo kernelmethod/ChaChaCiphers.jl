@@ -194,8 +194,7 @@ function chacha_blocks!(
         @cuda blocks=chunk_blocks _cuda_chacha_add_initial_state!(state, key, nonce, counter)
     end
 
-    counter += nblocks
-    counter
+    counter + nblocks
 end
 
 function _cuda_chacha_rounds!(state, doublerounds)
@@ -231,7 +230,7 @@ function _cuda_chacha_rounds!(state, doublerounds)
     nothing
 end
 
-export CHACHA_BLOCK_SIZE
+export CHACHA_BLOCK_SIZE, CHACHA_BLOCK_SIZE_U32
 export chacha_blocks!
 
 end # module
