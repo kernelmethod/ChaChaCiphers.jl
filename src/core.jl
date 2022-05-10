@@ -1,5 +1,6 @@
 using ChaChaCiphers.ChaCha: CHACHA_BLOCK_SIZE
 using Random: AbstractRNG
+using StaticArrays
 
 ### UnsafeView
 
@@ -26,10 +27,33 @@ function Base.getindex(a::UnsafeView{T}, i::UnitRange) where T
     UnsafeView(pointer(a) + view_start, len)
 end
 
+### ChaChaState
+
+"""
+    ChaChaState
+
+A `NamedTuple` storing the current state of a ChaCha keystream. `ChaChaState`
+can be used to save and restore the state of a keystream.
+"""
+const ChaChaState = @NamedTuple begin
+    key :: SVector{8,UInt32}
+    nonce :: UInt64
+    counter :: UInt64
+    position :: Int
+    doublerounds :: Int
+end
+
+
 ### AbstractChaChaStream
 
 # Number of bytes to store in an AbstractChaChaStream
 const STREAM_BUFFER_SIZE = CHACHA_BLOCK_SIZE
+
+if STREAM_BUFFER_SIZE % CHACHA_BLOCK_SIZE != 0
+    error("STREAM_BUFFER_SIZE must be a multiple of the CHACHA_BLOCK_SIZE")
+end
+
+const STREAM_BUFFER_BLOCKS = STREAM_BUFFER_SIZE ÷ CHACHA_BLOCK_SIZE
 
 """
     AbstractChaChaStream
@@ -44,4 +68,21 @@ abstract type AbstractChaChaStream <: AbstractRNG end
     T(SVector{8,UInt32}(rand(RandomDevice(), UInt32, 8)))
 (::Type{T})(key; kws...) where {T <: AbstractChaChaStream} =
     T(key, UInt64(0); kws...)
+(::Type{T})(state::ChaChaState) where {T <: AbstractChaChaStream} =
+    T(state.key, state.nonce, state.counter, state.position; doublerounds=state.doublerounds)
 
+"""
+    getstate(stream::AbstractChaChaStream)
+
+Return a `NamedTuple` containing enough state of the input
+`AbstractChaChaStream` to be able to reproduce it.
+"""
+function getstate(stream::AbstractChaChaStream)
+    (;
+        :key => key(stream),
+        :nonce => nonce(stream),
+        :counter => counter(stream) - STREAM_BUFFER_BLOCKS,
+        :position => position(stream),
+        :doublerounds => doublerounds(stream),
+    )
+end

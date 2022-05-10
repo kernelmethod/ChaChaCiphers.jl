@@ -46,5 +46,26 @@ using Test
         @test isapprox(mean(samples), 0., atol=1e-2)
         @test isapprox(std(samples), 1., atol=1e-2)
     end
+
+    @testset "Save and restore a keystream" begin
+        # Create a stream, run some operations on it,
+        # and save its state. Ensure that we can
+        # reproduce the stream from its saved state.
+        stream = ChaCha12Stream()
+        rand(stream, UInt8, 3_000)
+        stream_repro = getstate(stream) |> ChaChaStream
+
+        rand_orig = randn(stream, 5_000)
+        rand_repro = randn(stream_repro, 5_000)
+        @test rand_orig == rand_repro
+
+        stream = ChaCha20Stream()
+        randn(stream, Float64, 3_000)
+        stream_repro = getstate(stream) |> ChaChaStream
+
+        rand_orig = rand(stream, 1:10, 1024)
+        rand_repro = rand(stream_repro, 1:10, 1024)
+        @test rand_orig == rand_repro
+    end
 end
 

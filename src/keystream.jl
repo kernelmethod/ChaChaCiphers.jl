@@ -17,20 +17,28 @@ mutable struct ChaChaStream <: AbstractChaChaStream
     position :: Int
     doublerounds :: Int
 
-    function ChaChaStream(key, nonce, counter = UInt64(0); doublerounds = 10)
-        if doublerounds ∉ (6, 10)
-            error("`doublerounds` must be equal to 6 or 10")
+    function ChaChaStream(
+        key,
+        nonce,
+        counter = UInt64(0),
+        position = 1;
+        doublerounds = 10
+    )
+        if doublerounds < 0 || !iseven(doublerounds)
+            error("`doublerounds` must be an even positive number")
         end
 
         key = SVector{8,UInt32}(key)
         buffer = MVector{STREAM_BUFFER_SIZE,UInt8}(undef)
         stream = new(key, nonce, counter, buffer, 1, doublerounds)
         _refresh_buffer!(stream)
+        stream.position = position
+
+        stream
     end
 end
 
 # Constructors
-
 ChaCha20Stream(args...) = ChaChaStream(args...; doublerounds=10)
 ChaCha12Stream(args...) = ChaChaStream(args...; doublerounds=6)
 
@@ -38,6 +46,12 @@ Base.show(io::IO, rng::ChaChaStream) =
     write(io, "ChaChaStream(key=$(rng.key), nonce=$(rng.nonce), counter=$(rng.counter))")
 
 buffer_size(stream::ChaChaStream) = STREAM_BUFFER_SIZE - stream.position
+
+key(stream::ChaChaStream) = stream.key
+nonce(stream::ChaChaStream) = stream.nonce
+counter(stream::ChaChaStream) = stream.counter
+position(stream::ChaChaStream) = stream.position
+doublerounds(stream::ChaChaStream) = stream.doublerounds
 
 @generated function _refresh_buffer!(stream::ChaChaStream)
     local blocks_in_buffer, rem = divrem(STREAM_BUFFER_SIZE, CHACHA_BLOCK_SIZE)
