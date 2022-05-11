@@ -5,7 +5,7 @@ using Random
 using Statistics
 using Test
 
-@testset "ChaChaStream random number generation tests" begin
+@testset "ChaChaStream tests" begin
     @testset "Test create keystream" begin
         # Create a ChaChaStream with the default parameters
         stream = ChaChaStream()
@@ -43,7 +43,12 @@ using Test
         stream = ChaCha12Stream(zeros(8), 0)
         samples = rand(stream, Float32, (100_000,))
         @test isa(samples, Vector{Float32})
-        @test length(samples) == 100_000
+        @test size(samples) == (100_000,)
+        @test isapprox(mean(samples), 0.5, atol=1e-2)
+
+        samples = rand(stream, Float32, (100, 50, 50))
+        @test isa(samples, Array{Float32,3})
+        @test size(samples) == (100, 50, 50)
         @test isapprox(mean(samples), 0.5, atol=1e-2)
     end
 

@@ -45,6 +45,10 @@ julia> randn(stream)
 julia> randstring(stream, 'a':'z', 8)
 "klmptewr"
 ```
+
+```@meta
+DocTestSetup = nothing
+```
 """
 mutable struct ChaChaStream <: AbstractChaChaStream
     key :: SVector{8,UInt32}
