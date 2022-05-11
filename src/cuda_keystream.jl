@@ -32,6 +32,7 @@ julia> x = CuVector{Float32}(undef, 2^10);
 DocTestSetup = nothing
 ```
 
+See also: [`ChaChaStream`](@ref)
 """
 mutable struct CUDAChaChaStream <: AbstractChaChaStream
     key :: CuVector{UInt32}

@@ -15,6 +15,11 @@ ciphers. This package provides:
   building blocks for other cryptographic primitives, such as the
   ChaCha20-Poly1305 AEAD algorithm.
 
+The default stream cipher provided by this package follows [Daniel Bernstein's
+original implementation](https://cr.yp.to/chacha.html) (using a 64-bit counter
+and 64-bit nonce), which allows you to generate 1 ZiB of random data before the
+nonce must be recycled.
+
 ## Usage
 
 You can start using ChaChaCiphers.jl for random number generation by creating a

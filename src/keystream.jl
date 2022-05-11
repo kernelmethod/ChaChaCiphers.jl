@@ -49,6 +49,8 @@ julia> randstring(stream, 'a':'z', 8)
 ```@meta
 DocTestSetup = nothing
 ```
+
+See also: [`CUDAChaChaStream`](@ref)
 """
 mutable struct ChaChaStream <: AbstractChaChaStream
     key :: SVector{8,UInt32}
