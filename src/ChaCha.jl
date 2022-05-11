@@ -220,11 +220,11 @@ function _cuda_chacha_rounds!(state, doublerounds)
     for _ = 1:doublerounds
         # Columnar rounds
         _QR!(state_slice, i, i + 4, i + 8, i + 12)
-        CUDA.sync_threads()
+        CUDA.threadfence_block()
 
         # Diagonal rounds
         _QR!(state_slice, dgc1, dgc2, dgc3, dgc4)
-        CUDA.sync_threads()
+        CUDA.threadfence_block()
     end
 
     nothing
