@@ -86,6 +86,14 @@ using Test
         rand_orig = rand(stream, 1:10, 1024)
         rand_repro = rand(stream_repro, 1:10, 1024)
         @test rand_orig == rand_repro
+
+        # It should also be possible to directly call
+        # copy() to copy the state of a keystream
+        stream = ChaCha20Stream()
+        stream_copy = copy(stream)
+
+        @test rand(stream, UInt32, 50) == rand(stream_copy, UInt32, 50)
+        @test randn(stream, 1500) == randn(stream_copy, 1500)
     end
 
     @testset "Encrypt data with a keystream" begin

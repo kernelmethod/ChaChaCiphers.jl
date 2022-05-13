@@ -86,3 +86,5 @@ function getstate(stream::AbstractChaChaStream)
         :doublerounds => doublerounds(stream),
     )
 end
+
+Base.copy(stream::T) where {T <: AbstractChaChaStream} = T(getstate(stream))
