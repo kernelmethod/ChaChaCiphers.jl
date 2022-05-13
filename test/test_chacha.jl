@@ -173,7 +173,7 @@ using Test
 end
 
 @testset "CUDA ChaCha tests" begin
-    if CUDA.functional()
+    @check_cuda begin
         @testset "Test quarter-round function" begin
             # Ref: IETF RFC 8439, Sec. 2.1.1
             # https://datatracker.ietf.org/doc/html/rfc8439#section-2.1.1

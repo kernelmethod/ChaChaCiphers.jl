@@ -8,7 +8,7 @@ using Statistics
 using Test
 
 @testset "CUDAChaChaStream tests" begin
-    if CUDA.functional()
+    @check_cuda begin
         @testset "Construct CUDAChaChaStream" begin
             rng = CUDAChaCha12Stream()
             @test rng.doublerounds == 6
@@ -85,7 +85,5 @@ using Test
 
             @test rand_gpu == rand_cpu
         end
-    else
-        @warn "CUDA.functional() = false; skipping tests"
     end
 end

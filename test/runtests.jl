@@ -1,5 +1,7 @@
 using ChaChaCiphers, Documenter, Test
 
+include("utils.jl")
+
 include("test_core.jl")
 include("test_chacha.jl")
 include("test_keystream.jl")
