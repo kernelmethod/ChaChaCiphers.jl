@@ -14,22 +14,10 @@ generator for GPU CRNG.
 Create a `CUDAChaChaStream` with a randomized key, and
 sample some random numbers with it:
 
-```@meta
-DocTestSetup = quote
-    using CUDA
-    using ChaChaCiphers
-    using Random
-end
-```
-
 ```julia
 julia> rng = CUDAChaChaStream();
 
 julia> x = CuVector{Float32}(undef, 2^10);
-```
-
-```@meta
-DocTestSetup = nothing
 ```
 
 See also: [`ChaChaStream`](@ref)

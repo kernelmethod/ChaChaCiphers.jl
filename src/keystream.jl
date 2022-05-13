@@ -15,21 +15,14 @@ generation functions.
 
 Create a `ChaChaStream` with a randomly-generated key and nonce:
 
-```@meta
-DocTestSetup = quote
-    using ChaChaCiphers
-    using Random
-end
-```
-
-```jldoctest
+```jldoctest; setup = :(using ChaChaCiphers, Random)
 julia> stream = ChaCha20Stream();
 ```
 
 Create a `ChaChaStream` with a pre-specified key and nonce, and
 use it to generate random data:
 
-```jldoctest
+```jldoctest; setup = :(using ChaChaCiphers, Random)
 julia> key = UInt32.([
           0xe2e39848, 0x70bb974d, 0x845f88b4, 0xb30725e4,
           0x15c309dc, 0x72d545bb, 0x466e99e3, 0x6a759f91
@@ -44,10 +37,6 @@ julia> randn(stream)
 
 julia> randstring(stream, 'a':'z', 8)
 "klmptewr"
-```
-
-```@meta
-DocTestSetup = nothing
 ```
 
 See also: [`CUDAChaChaStream`](@ref)
