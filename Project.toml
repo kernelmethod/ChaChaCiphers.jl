@@ -1,7 +1,7 @@
 name = "ChaChaCiphers"
 uuid = "f23b13a2-9352-431b-a28a-b2f20c485fa1"
 authors = ["kernelmethod <17100608+kernelmethod@users.noreply.github.com> and contributors"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
