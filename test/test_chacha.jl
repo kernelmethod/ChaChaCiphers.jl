@@ -13,7 +13,7 @@ using StaticArrays
 using Test
 
 function chacha_blocks_test_suite(T)
-    @testset "Test chacha_blocks!" begin
+    @testset "RFC 8439 ChaCha block function tests" begin
         # Ref: IETF RFC 8439, Sec. 2.3.2
         # https://datatracker.ietf.org/doc/html/rfc8439#section-2.3.2
         key = SVector{8,UInt32}([
@@ -114,6 +114,42 @@ function chacha_blocks_test_suite(T)
         @test state == test_vector
     end
 
+    @testset "Extended ChaCha block function tests" begin
+        # Run multiple blocks of ChaCha with key, counter, and nonce equal
+        # to zero
+        #
+        # It's more efficient to compute multiple blocks in parallel on both
+        # CPU and GPU, so this test ensures that parallelization doesn't
+        # introduce any new errors.
+        key = SVector{8,UInt32}(zeros(UInt32, 8)) |> T
+        nonce = UInt64(0)
+        counter = UInt64(0)
+        test_vector = SVector{64,UInt32}([
+            # Block 1
+            0xade0b876, 0x903df1a0, 0xe56a5d40, 0x28bd8653,
+            0xb819d2bd, 0x1aed8da0, 0xccef36a8, 0xc70d778b,
+            0x7c5941da, 0x8d485751, 0x3fe02477, 0x374ad8b8,
+            0xf4b8436a, 0x1ca11815, 0x69b687c3, 0x8665eeb2,
+            # Block 2
+            0xbee7079f, 0x7a385155, 0x7c97ba98, 0x0d082d73,
+            0xa0290fcb, 0x6965e348, 0x3e53c612, 0xed7aee32,
+            0x7621b729, 0x434ee69c, 0xb03371d5, 0xd539d874,
+            0x281fed31, 0x45fb0a51, 0x1f0ae1ac, 0x6f4d794b,
+            # Block 3
+            0xe6a0092d, 0xe16c2663, 0x08d17eae, 0x75a06819,
+            0x998e718e, 0xc662d37b, 0x3446c3b0, 0x5db3a0a9,
+            0x68372701, 0x0f5d7b1f, 0xfd3a1e28, 0x1ebc58e4,
+            0x13d3d273, 0xc094cfc9, 0x6271f35f, 0xf248a240,
+            # Block 4
+            0x58a02013, 0x6b56b3d7, 0xaada20d5, 0x0abfd23e,
+            0x20b1b8c5, 0x732785fb, 0x349763c3, 0xa4915cb4,
+            0x83cbd42d, 0x2e0d84f8, 0x1358b1ed, 0x3fac6210,
+            0xfff82c1f, 0x5618cd6d, 0x6c1e6ae8, 0x7e166731
+        ]) |> T
+        state = MVector{64,UInt32}(undef) |> T
+        @test ChaCha.chacha_blocks!(state, key, nonce, counter, 4) == counter + 4
+        @test state == test_vector
+    end
 end
 
 @testset "ChaCha tests" begin

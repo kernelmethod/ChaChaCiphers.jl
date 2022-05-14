@@ -122,17 +122,12 @@ end
 function _fill_blocks!(
     buffer::AbstractVector{T}, stream::ChaChaStream, nblocks::Int
 ) where {T <: BitInteger}
-    bufsize_u32 = div(length(buffer) * sizeof(T), sizeof(UInt32))
+    bufsize_u32 = sizeof(buffer) ÷ sizeof(UInt32)
 
     GC.@preserve buffer begin
-        # Create a pointer to the start of the block,
-        # and wrap it in an instance of UnsafeView.
-        #
-        # This provides a decent speedup over using
-        # reinterpret(UInt32, ...)
         bp = pointer(buffer)
         bp = Base.unsafe_convert(Ptr{UInt32}, bp)
-        bufview = UnsafeView(bp, bufsize_u32)
+        bufview = unsafe_wrap(Vector{UInt32}, bp, bufsize_u32)
 
         stream.counter = chacha_blocks!(
             bufview,
