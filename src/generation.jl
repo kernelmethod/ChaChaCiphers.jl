@@ -56,7 +56,7 @@ function Random.rand!(
     @GC.preserve A begin
         p = pointer(A)
         p = Base.unsafe_convert(Ptr{UInt8}, p)
-        buf = unsafe_wrap(Vector{UInt8}, p, length(A) * sizeof(T), own=false)
+        buf = unsafe_wrap(Vector{UInt8}, p, sizeof(A), own=false)
 
         _fill_buffer!(buf, rng)
     end
