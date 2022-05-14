@@ -20,6 +20,11 @@ original implementation](https://cr.yp.to/chacha.html) (using a 64-bit counter
 and 64-bit nonce), which allows you to generate 1 ZiB of random data before the
 nonce must be recycled.
 
+## Installation
+
+You can install ChaChaCiphers.jl with `julia> ] add ChaChaCiphers` in the Julia
+REPL, or with `using Pkg; Pkg.add("ChaChaCiphers");`.
+
 ## Usage
 
 You can start using ChaChaCiphers.jl for random number generation by creating a
