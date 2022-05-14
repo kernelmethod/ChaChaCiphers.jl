@@ -5,8 +5,8 @@ for CSPRNG.
 
 module ChaCha
 
-using Core.Intrinsics: llvmcall
 using CUDA
+using SIMD
 using StaticArrays
 
 # ChaCha block size is 32 * 16 bits = 64 bytes
@@ -14,34 +14,39 @@ const CHACHA_BLOCK_SIZE_U32 = 16
 const CHACHA_BLOCK_SIZE = div(32 * 16, 8)
 
 @inline lrot32(x, n) = (x << n) | (x >> (32 - n))
-@inline lrot32(x::UInt32, n::UInt32) = llvmcall(
-    ("""
-     declare i32 @llvm.fshl.i32(i32, i32, i32)
-     define i32 @entry(i32, i32, i32) #0 {
-     3:
-        %res = call i32 @llvm.fshl.i32(i32 %0, i32 %0, i32 %1)
-        ret i32 %res
-     }
-     attributes #0 = { alwaysinline }
-     """, "entry"), UInt32, Tuple{UInt32, UInt32}, x, n)
+@inline lrot32(x::Union{Vec,UInt32}, n) = bitrotate(x, n)
 
-@inline function _QR!(x, a, b, c, d)
-    @inbounds begin
-        x[a] += x[b]; x[d] ⊻= x[a]; x[d] = lrot32(x[d], UInt32(16))
-        x[c] += x[d]; x[b] ⊻= x[c]; x[b] = lrot32(x[b], UInt32(12))
-        x[a] += x[b]; x[d] ⊻= x[a]; x[d] = lrot32(x[d],  UInt32(8))
-        x[c] += x[d]; x[b] ⊻= x[c]; x[b] = lrot32(x[b],  UInt32(7))
+@inline @generated function rotatevector(x::Vec{N,T}, ::Val{M}) where {N,T,M}
+    rotation = circshift(0:3, M)
+    rotation = repeat(rotation, N ÷ 4)
+    rotation += 4 * ((0:N-1) .÷ 4)
+    rotation = Val(Tuple(rotation))
+    :(shufflevector(x, $rotation))
+end
+
+macro _QR!(a, b, c, d)
+    quote
+        $(esc(a)) += $(esc(b)); $(esc(d)) ⊻= $(esc(a)); $(esc(d)) = lrot32($(esc(d)), 16);
+        $(esc(c)) += $(esc(d)); $(esc(b)) ⊻= $(esc(c)); $(esc(b)) = lrot32($(esc(b)), 12);
+        $(esc(a)) += $(esc(b)); $(esc(d)) ⊻= $(esc(a)); $(esc(d)) = lrot32($(esc(d)), 8);
+        $(esc(c)) += $(esc(d)); $(esc(b)) ⊻= $(esc(c)); $(esc(b)) = lrot32($(esc(b)), 7);
+
+        $(esc(a)), $(esc(b)), $(esc(c)), $(esc(d))
     end
 end
 
 @inline function store_u64!(x::AbstractVector{UInt32}, u::UInt64, idx)
-    x[idx] = UInt32(u & 0xffffffff)
-    x[idx+1] = UInt32((u >> 32) & 0xffffffff)
+    @inbounds begin
+        x[idx] = UInt32(u & 0xffffffff)
+        x[idx+1] = UInt32((u >> 32) & 0xffffffff)
+    end
 end
 
 @inline function add_u64!(x::AbstractVector{UInt32}, u::UInt64, idx)
-    x[idx] += UInt32(u & 0xffffffff)
-    x[idx+1] += UInt32((u >> 32) & 0xffffffff)
+    @inbounds begin
+        x[idx] += UInt32(u & 0xffffffff)
+        x[idx+1] += UInt32((u >> 32) & 0xffffffff)
+    end
 end
 
 #=
@@ -144,38 +149,87 @@ function chacha_blocks!(
     nblocks = 1;
     doublerounds = 10,
 )
-    for i ∈ 1:nblocks
-        block_start = CHACHA_BLOCK_SIZE_U32 * (i - 1) + 1
-        block_end = block_start + CHACHA_BLOCK_SIZE_U32 - 1
-        state = view(buffer, block_start:block_end)
+    block_start = 1
 
-        _chacha_set_initial_state!(state, key, nonce, counter, 1)
+    # We compute as many blocks of output as possible with 512-bit
+    # SIMD vectorization
+    for i ∈ 1:4:nblocks-3
+        block_start, counter = _chacha_blocks!(
+            buffer, block_start, key, nonce, counter, doublerounds, Val(4)
+        )
+    end
 
-        # Perform alternating rounds of columnar
-        # quarter-rounds and diagonal quarter-rounds
-        for i = 1:doublerounds
-            # Columnar rounds
-            _QR!(state, 1, 5, 9, 13)
-            _QR!(state, 2, 6, 10, 14)
-            _QR!(state, 3, 7, 11, 15)
-            _QR!(state, 4, 8, 12, 16)
-
-            # Diagonal rounds
-            _QR!(state, 1, 6, 11, 16)
-            _QR!(state, 2, 7, 12, 13)
-            _QR!(state, 3, 8, 9, 14)
-            _QR!(state, 4, 5, 10, 15)
-        end
-
-        # Finish by adding the initial state back to
-        # the original state, so that the operations
-        # are no longer invertible
-        _chacha_add_initial_state!(state, key, nonce, counter, 1)
-
-        counter += 1
+    # The remaining blocks are computed with 128-bit vectorization
+    for i ∈ 1:(nblocks % 4)
+        block_start, counter = _chacha_blocks!(
+            buffer, block_start, key, nonce, counter, doublerounds, Val(1)
+        )
     end
 
     counter
+end
+
+# Compute the ChaCha block function with N * 128-bit SIMD vectorization
+#
+# Reference: https://eprint.iacr.org/2013/759.pdf
+@inline function _chacha_blocks!(
+    buffer::AbstractVector{UInt32}, block_start, key, nonce, counter, doublerounds, ::Val{N}
+) where N
+    block_end = block_start + N * CHACHA_BLOCK_SIZE_U32 - 1
+    @inbounds state = view(buffer, block_start:block_end)
+
+    for i = 0:N-1
+        _chacha_set_initial_state!(state, key, nonce, counter + i, i * CHACHA_BLOCK_SIZE_U32 + 1)
+    end
+
+    _chacha_rounds!(state, doublerounds, Val(N))
+
+    for i = 0:N-1
+        _chacha_add_initial_state!(state, key, nonce, counter + i, i * CHACHA_BLOCK_SIZE_U32 + 1)
+    end
+
+    block_end + 1, counter + N
+end
+
+
+@inline @generated function _chacha_rounds!(state, doublerounds, ::Val{N}) where N
+    # Perform alternating rounds of columnar
+    # quarter-rounds and diagonal quarter-rounds
+    lane = (1, 2, 3, 4)
+    lane = repeat(1:4, N)
+    lane += 16 * ((0:4*N-1) .÷ 4)
+    lane = Tuple(lane)
+
+    idx0 = Vec(lane)
+    idx1 = Vec(lane .+ 4)
+    idx2 = Vec(lane .+ 8)
+    idx3 = Vec(lane .+ 12)
+
+    quote
+        @inbounds begin
+            v0 = vgather(state, $idx0)
+            v1 = vgather(state, $idx1)
+            v2 = vgather(state, $idx2)
+            v3 = vgather(state, $idx3)
+
+            for i = 1:doublerounds
+                v0, v1, v2, v3 = @_QR!(v0, v1, v2, v3)
+                v1 = rotatevector(v1, Val(-1))
+                v2 = rotatevector(v2, Val(-2))
+                v3 = rotatevector(v3, Val(-3))
+
+                v0, v1, v2, v3 = @_QR!(v0, v1, v2, v3)
+                v1 = rotatevector(v1, Val(1))
+                v2 = rotatevector(v2, Val(2))
+                v3 = rotatevector(v3, Val(3))
+            end
+
+            vscatter(v0, state, $idx0)
+            vscatter(v1, state, $idx1)
+            vscatter(v2, state, $idx2)
+            vscatter(v3, state, $idx3)
+        end
+    end
 end
 
 function chacha_blocks!(
@@ -204,7 +258,7 @@ function _cuda_chacha_rounds!(state, doublerounds)
 
     # Only operate on a slice of the state corresponding to
     # the thread block
-    state_slice = view(state, block+1:block+16)
+    slice = view(state, block+1:block+16)
 
     # Pre-compute the indices that this thread will use to
     # perform its diagonal rounds
@@ -219,11 +273,11 @@ function _cuda_chacha_rounds!(state, doublerounds)
     # Each thread in the same block runs its rounds in parallel
     for _ = 1:doublerounds
         # Columnar rounds
-        _QR!(state_slice, i, i + 4, i + 8, i + 12)
+        @_QR!(slice[i], slice[i+4], slice[i+8], slice[i+12])
         CUDA.threadfence_block()
 
         # Diagonal rounds
-        _QR!(state_slice, dgc1, dgc2, dgc3, dgc4)
+        @_QR!(slice[dgc1], slice[dgc2], slice[dgc3], slice[dgc4])
         CUDA.threadfence_block()
     end
 
