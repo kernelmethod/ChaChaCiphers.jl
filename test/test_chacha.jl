@@ -157,7 +157,7 @@ end
         # Ref: IETF RFC 8439, Sec. 2.1.1
         # https://datatracker.ietf.org/doc/html/rfc8439#section-2.1.1
         state = MVector{4,UInt32}([0x11111111, 0x01020304, 0x9b8d6f43, 0x01234567])
-        ChaCha._QR!(state, 1, 2, 3, 4)
+        ChaCha.@_QR!(state[1], state[2], state[3], state[4])
 
         expected_state = SVector{4,UInt32}([0xea2a92f4, 0xcb1cf8ce, 0x4581472e, 0x5881c4bb])
 
@@ -174,7 +174,7 @@ end
         ])
         initial_state = deepcopy(state)
 
-        ChaCha._QR!(state, 3, 8, 9, 14)
+        ChaCha.@_QR!(state[3], state[8], state[9], state[14])
 
         mask = trues(length(state))
         mask[3] = mask[8] = mask[9] = mask[14] = false
@@ -224,11 +224,11 @@ end
 
             function kernel(state, a, b, c, d)
                 i = 4 * (threadIdx().x - 1)
-                ChaCha._QR!(state, i + a, i + b, i + c, i + d)
+                ChaCha.@_QR!(state[i+a], state[i+b], state[i+c], state[i+d])
                 nothing
             end
 
-            ChaCha._QR!(state, 1, 2, 3, 4)
+            ChaCha.@_QR!(state[1], state[2], state[3], state[4])
             CUDA.@sync @cuda threads=1024 kernel(state_gpu, 1, 2, 3, 4)
 
             @test state_gpu == CuArray(collect(repeat(state, 1024)))

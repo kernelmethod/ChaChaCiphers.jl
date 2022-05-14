@@ -24,21 +24,15 @@ const CHACHA_BLOCK_SIZE = div(32 * 16, 8)
     :(shufflevector(x, $rotation))
 end
 
-@inline function _QR!(x, a, b, c, d)
-    @inbounds begin
-        x[a] += x[b]; x[d] ⊻= x[a]; x[d] = lrot32(x[d], UInt32(16))
-        x[c] += x[d]; x[b] ⊻= x[c]; x[b] = lrot32(x[b], UInt32(12))
-        x[a] += x[b]; x[d] ⊻= x[a]; x[d] = lrot32(x[d],  UInt32(8))
-        x[c] += x[d]; x[b] ⊻= x[c]; x[b] = lrot32(x[b],  UInt32(7))
-    end
-end
+macro _QR!(a, b, c, d)
+    quote
+        $(esc(a)) += $(esc(b)); $(esc(d)) ⊻= $(esc(a)); $(esc(d)) = lrot32($(esc(d)), 16);
+        $(esc(c)) += $(esc(d)); $(esc(b)) ⊻= $(esc(c)); $(esc(b)) = lrot32($(esc(b)), 12);
+        $(esc(a)) += $(esc(b)); $(esc(d)) ⊻= $(esc(a)); $(esc(d)) = lrot32($(esc(d)), 8);
+        $(esc(c)) += $(esc(d)); $(esc(b)) ⊻= $(esc(c)); $(esc(b)) = lrot32($(esc(b)), 7);
 
-@inline function _QR!(a, b, c, d)
-    a += b; d ⊻= a; d = lrot32(d, UInt32(16));
-    c += d; b ⊻= c; b = lrot32(b, UInt32(12));
-    a += b; d ⊻= a; d = lrot32(d, UInt32(8));
-    c += d; b ⊻= c; b = lrot32(b, UInt32(7));
-    a, b, c, d
+        $(esc(a)), $(esc(b)), $(esc(c)), $(esc(d))
+    end
 end
 
 @inline function store_u64!(x::AbstractVector{UInt32}, u::UInt64, idx)
@@ -219,12 +213,12 @@ end
             v3 = vgather(state, $idx3)
 
             for i = 1:doublerounds
-                v0, v1, v2, v3 = _QR!(v0, v1, v2, v3)
+                v0, v1, v2, v3 = @_QR!(v0, v1, v2, v3)
                 v1 = rotatevector(v1, Val(-1))
                 v2 = rotatevector(v2, Val(-2))
                 v3 = rotatevector(v3, Val(-3))
 
-                v0, v1, v2, v3 = _QR!(v0, v1, v2, v3)
+                v0, v1, v2, v3 = @_QR!(v0, v1, v2, v3)
                 v1 = rotatevector(v1, Val(1))
                 v2 = rotatevector(v2, Val(2))
                 v3 = rotatevector(v3, Val(3))
@@ -264,7 +258,7 @@ function _cuda_chacha_rounds!(state, doublerounds)
 
     # Only operate on a slice of the state corresponding to
     # the thread block
-    state_slice = view(state, block+1:block+16)
+    slice = view(state, block+1:block+16)
 
     # Pre-compute the indices that this thread will use to
     # perform its diagonal rounds
@@ -279,11 +273,11 @@ function _cuda_chacha_rounds!(state, doublerounds)
     # Each thread in the same block runs its rounds in parallel
     for _ = 1:doublerounds
         # Columnar rounds
-        _QR!(state_slice, i, i + 4, i + 8, i + 12)
+        @_QR!(slice[i], slice[i+4], slice[i+8], slice[i+12])
         CUDA.threadfence_block()
 
         # Diagonal rounds
-        _QR!(state_slice, dgc1, dgc2, dgc3, dgc4)
+        @_QR!(slice[dgc1], slice[dgc2], slice[dgc3], slice[dgc4])
         CUDA.threadfence_block()
     end
 
