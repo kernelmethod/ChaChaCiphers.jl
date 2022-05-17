@@ -2,6 +2,7 @@
 
 using ChaChaCiphers
 using Random
+using SparseArrays
 using Statistics
 using Test
 
@@ -94,6 +95,21 @@ using Test
 
         @test rand(stream, UInt32, 50) == rand(stream_copy, UInt32, 50)
         @test randn(stream, 1500) == randn(stream_copy, 1500)
+    end
+
+    @testset "Generate random sparse array" begin
+        rng = ChaCha12Stream()
+        x = sprand(rng, Int32, 400, 400, 0.1)
+
+        @test x isa AbstractMatrix{Int32}
+        @test x isa SparseMatrixCSC{Int32}
+        @test isapprox(mean(x .== 0), 0.9, atol=1e-2)
+
+        Random.rand!(rng, x)
+
+        @test x isa AbstractMatrix{Int32}
+        @test x isa SparseMatrixCSC{Int32}
+        @test (x .!= 0) |> all
     end
 
     @testset "Encrypt data with a keystream" begin
