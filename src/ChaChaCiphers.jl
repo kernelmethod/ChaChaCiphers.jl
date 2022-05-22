@@ -2,7 +2,9 @@ module ChaChaCiphers
 
 include("ChaCha.jl")
 
+include("memory.jl")
 include("core.jl")
+
 include("keystream.jl")
 include("cuda_keystream.jl")
 include("generation.jl")
